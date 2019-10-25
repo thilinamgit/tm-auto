@@ -1,0 +1,13 @@
+source 'https://supermarket.chef.io'
+
+cookbook 'apt', '=6.1.0'
+cookbook 'ark', '=3.1.0'
+cookbook 'application_javascript', '=1.0.0'
+cookbook 'application', '=5.1.0'
+cookbook 'build-essential', '=8.0.2'
+cookbook 'compat_resource', '=12.19.0'
+cookbook 'nginx', '=8.1.6'
+cookbook 'java', '=4.3.0'
+cookbook 'database', '=6.1.1'
+cookbook 'rsyslog', '= 6.0.4'
+cookbook 'php', '=6.1.1'

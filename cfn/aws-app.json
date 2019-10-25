@@ -1,0 +1,627 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Setup App Server Stack",
+
+  "Parameters": {
+    "ChefSshKey": {
+      "Description": "The ssh key needed to clone the automation code repo",
+      "Type": "String",
+      "NoEcho": "true",
+      "Default": ""
+    },
+    "AppSshKey": {
+      "Description": "The ssh key needed to clone the application code repo",
+      "Type": "String",
+      "NoEcho": "true",
+      "Default": ""
+    },
+    "GitToken": {
+      "Description": "Git Token",
+      "Type": "String",
+      "Default": "gittoken"
+    },
+    "Revision": {
+      "Description": "Git revision to use",
+      "Type": "String",
+      "Default": "master"
+    },
+    "Region": {
+      "Description": "AWS region to use",
+      "Type": "String",
+      "Default": "eu-west-1"
+    },
+    "VPC": {
+      "Description": "ID of the VPC for the server stacks",
+      "Type": "String"
+    },
+    "PublicSubnetA": {
+      "Description": "ID of the public subnet A",
+      "Type": "String"
+    },
+    "PublicSubnetB": {
+      "Description": "ID of the public subnet B",
+      "Type": "String"
+    },
+    "PublicSubnetC": {
+      "Description": "ID of the public subnet C",
+      "Type": "String"
+    },
+    "PrivateSubnetA": {
+      "Description": "ID of the private subnet A",
+      "Type": "String"
+    },
+    "PrivateSubnetB": {
+      "Description": "ID of the private subnet B",
+      "Type": "String"
+    },
+    "PrivateSubnetC": {
+      "Description": "ID of the private subnet C",
+      "Type": "String"
+    },
+    "Hostname": {
+      "Description": "Domain name",
+      "Type": "String",
+      "Default": "tl-stage.com"
+    },
+    "RDSDBEndpoint": {
+      "Description": "RDS DB Endpoint",
+      "Type": "String",
+      "Default": ""
+    },
+    "RDSPassword": {
+      "Description": "RDS DB Password",
+      "Type": "String",
+      "Default": ""
+    },
+    "AwsKey": {
+      "Description": "AWS Key",
+      "Type": "String",
+      "Default": ""
+    },
+    "AwsSecret": {
+      "Description": "AWS Secret",
+      "Type": "String",
+      "Default": ""
+    },
+    "AppServerCertificateID": {
+      "Description": "AppServer Certificate ID",
+      "Type": "String",
+      "Default": ""
+    },
+    "CloudwatchKey": {
+      "Description": "AWS Cloudwatch Key",
+      "Type": "String",
+      "Default": ""
+    },
+    "CloudwatchSecret": {
+      "Description": "AWS Cloudwatch Secret",
+      "Type": "String",
+      "Default": ""
+    }
+  },
+
+  "Mappings" : {
+    "Region2Principal" : {
+      "us-east-1"      : { "EC2Principal" : "ec2.amazonaws.com", "OpsWorksPrincipal" : "opsworks.amazonaws.com" },
+      "us-east-2"      : { "EC2Principal" : "ec2.amazonaws.com", "OpsWorksPrincipal" : "opsworks.amazonaws.com" },
+      "us-west-2"      : { "EC2Principal" : "ec2.amazonaws.com", "OpsWorksPrincipal" : "opsworks.amazonaws.com" },
+      "eu-west-1"      : { "EC2Principal" : "ec2.amazonaws.com", "OpsWorksPrincipal" : "opsworks.amazonaws.com" },
+      "eu-west-2"      : { "EC2Principal" : "ec2.amazonaws.com", "OpsWorksPrincipal" : "opsworks.amazonaws.com" },
+      "eu-central-1"   : { "EC2Principal" : "ec2.amazonaws.com", "OpsWorksPrincipal" : "opsworks.amazonaws.com" },
+      "ap-south-1"     : { "EC2Principal" : "ec2.amazonaws.com", "OpsWorksPrincipal" : "opsworks.amazonaws.com" }
+    }
+  },
+
+  "Outputs": {
+    "AppServerURL" : {
+      "Description" : "URL of the website",
+      "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "AppServerALB", "DNSName" ]}]]}
+    },
+    "AppStackID" : {
+      "Description" : "App Opsworks stack ID",
+      "Value" :  { "Ref": "AppOpsWorksStack" },
+      "Export" : { "Name" : "AppStackID" }
+    }
+  },
+
+  "Resources": {
+
+    "AppOpsWorksStack": {
+      "Type": "AWS::OpsWorks::Stack",
+      "Properties": {
+        "Name": {
+          "Ref": "AWS::StackName"
+        },
+        "DefaultOs": "Ubuntu 16.04 LTS",
+        "DefaultRootDeviceType": "ebs",
+        "ServiceRoleArn": {
+          "Fn::GetAtt": [
+            "OpsWorksServiceRole",
+            "Arn"
+          ]
+        },
+        "DefaultInstanceProfileArn": {
+          "Fn::GetAtt": [
+            "OpsWorksInstanceProfile",
+            "Arn"
+          ]
+        },
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "DefaultSubnetId": {
+          "Ref": "PrivateSubnetA"
+        },
+        "AgentVersion": "4026-20180131042024",
+        "ConfigurationManager": {
+          "Name": "Chef",
+          "Version": "12"
+        },
+        "UseCustomCookbooks": "true",
+        "CustomCookbooksSource": {
+          "Type": "git",
+          "Url": "git@github.com:thilinamgit/tm-auto.git",
+          "SshKey": {
+            "Ref": "ChefSshKey"
+          },
+          "Revision": {
+            "Ref": "Revision"
+          }
+        },
+        "CustomJson": {
+          "tl": {
+            "github_api_token": { "Ref": "GitToken"},
+            "hostname": { "Ref": "Hostname"},
+            "database": {
+              "host": { "Ref": "RDSDBEndpoint" },
+              "password": { "Ref": "RDSPassword" }
+            },
+            "aws_key": { "Ref": "AwsKey" },
+            "aws_secret": { "Ref": "AwsSecret" },
+            "aws_region": { "Ref": "Region" },
+            "aws": {
+              "cloudwatch": {
+                "aws_key": {
+                  "Ref": "CloudwatchKey"
+                },
+                "aws_secret": {
+                  "Ref": "CloudwatchSecret"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "AppOpsWorksLayer": {
+      "Type": "AWS::OpsWorks::Layer",
+      "Metadata": {
+        "Comment": "OpsWorks instances require outbound Internet access."
+      },
+      "DependsOn": [
+        "OpsWorksApp"
+      ],
+      "Properties": {
+        "StackId": {
+          "Ref": "AppOpsWorksStack"
+        },
+        "Name": "tl-app",
+        "Type": "custom",
+        "Shortname": "app-server",
+        "EnableAutoHealing": "true",
+        "AutoAssignElasticIps": "false",
+        "AutoAssignPublicIps": "false",
+        "CustomSecurityGroupIds": [
+          {
+            "Ref": "OpsWorksSecurityGroup"
+          }
+        ],
+        "CustomJson": {
+          "alb_helper": {
+            "target_group_arn": { "Ref": "AppTgtGrp" },
+            "connection_draining_timeout": 300,
+            "state_check_frequency": 30
+          }
+        },
+        "CustomRecipes": {
+          "Setup": [
+            "tl::user",
+            "tl::java-install",
+            "tl::nginx-install",
+            "tl::php-install",
+            "tl::mysql-client",
+            "tl::tcp-connections",
+            "tl::swappiness"
+          ],
+          "Configure": [],
+          "Deploy": [
+            "tl",
+            "tl::base",
+            "tl-app",
+            "tl-app::deploy",
+            "tl-app::nginx-config",
+            "tl::nginx-restart",
+            "tl-app::alb_attach"
+          ],
+          "Undeploy": [],
+          "Shutdown": [
+            "tl-app::alb_detach"
+          ]
+        },
+        "LoadBasedAutoScaling" : {
+          "Enable": "true",
+          "DownScaling": {
+            "InstanceCount": 1,
+            "ThresholdsWaitTime": 5,
+            "IgnoreMetricsTime": 10,
+            "CpuThreshold": 10.0,
+            "MemoryThreshold": 15.0,
+            "LoadThreshold" : 0.3
+          },
+          "UpScaling": {
+            "InstanceCount": 1,
+            "ThresholdsWaitTime": 5,
+            "IgnoreMetricsTime": 15,
+            "CpuThreshold": 60.0,
+            "MemoryThreshold": 85.0,
+            "LoadThreshold" : 0.7
+          }
+        }
+      }
+    },
+
+    "OpsWorksApp": {
+      "Type": "AWS::OpsWorks::App",
+      "Properties": {
+        "StackId": {
+          "Ref": "AppOpsWorksStack"
+        },
+        "Name": "TL application",
+        "Shortname": "tl-app",
+        "Type": "other",
+        "AppSource": {
+          "Type": "git",
+          "Url": "git@github.com:thilinamgit/web-app.git",
+          "SshKey": {
+            "Ref": "AppSshKey"
+          },
+          "Revision": {
+            "Ref": "Revision"
+          }
+        }
+      }
+    },
+
+    "OpsWorksInstanceA": {
+      "Type": "AWS::OpsWorks::Instance",
+      "Properties": {
+        "StackId": {
+          "Ref": "AppOpsWorksStack"
+        },
+        "LayerIds": [
+          {
+            "Ref": "AppOpsWorksLayer"
+          }
+        ],
+        "Architecture": "x86_64",
+        "InstallUpdatesOnBoot": "true",
+        "InstanceType": "t3.small",
+        "RootDeviceType": "ebs",
+        "AutoScalingType" : "load",
+        "SubnetId" : { "Ref" : "PrivateSubnetA" }
+      }
+    },
+
+    "OpsWorksInstanceB": {
+      "Type": "AWS::OpsWorks::Instance",
+      "Properties": {
+        "StackId": {
+          "Ref": "AppOpsWorksStack"
+        },
+        "LayerIds": [
+          {
+            "Ref": "AppOpsWorksLayer"
+          }
+        ],
+        "Architecture": "x86_64",
+        "InstallUpdatesOnBoot": "true",
+        "InstanceType": "t3.small",
+        "RootDeviceType": "ebs",
+        "AutoScalingType" : "load",
+        "SubnetId" : { "Ref" : "PrivateSubnetB" }
+      }
+    },
+
+    "OpsWorksServiceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  {
+                    "Fn::FindInMap": [
+                      "Region2Principal",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "OpsWorksPrincipal"
+                    ]
+                  }
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "opsworks-service",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ec2:*",
+                    "iam:PassRole",
+                    "cloudwatch:GetMetricStatistics",
+                    "elasticloadbalancing:*"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    "OpsWorksInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          { "Ref": "OpsWorksInstanceRole"}
+        ]
+      }
+    },
+
+    "OpsWorksInstanceRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  {
+                    "Fn::FindInMap": [
+                      "Region2Principal",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "EC2Principal"
+                    ]
+                  }
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/",
+        "Policies": [
+          {
+            "PolicyName": "alb-opsworks",
+            "PolicyDocument": {
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "elasticloadbalancing:RegisterTargets",
+                    "elasticloadbalancing:DeregisterTargets",
+                    "elasticloadbalancing:DescribeTargetHealth",
+                    "ec2:DescribeTags",
+                    "cloudwatch:PutMetricData",
+                    "cloudwatch:GetMetricStatistics",
+                    "cloudwatch:ListMetrics"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    "OpsWorksSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Allow inbound requests from the ELB to the OpsWorks instances",
+        "VpcId": {"Ref": "VPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "10.0.0.0/16"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "SourceSecurityGroupId": { "Ref": "AppServerLoadBalancerSecurityGroup" }
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "443",
+            "ToPort": "443",
+            "CidrIp": "10.0.0.0/16"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "443",
+            "ToPort": "443",
+            "SourceSecurityGroupId": { "Ref": "AppServerLoadBalancerSecurityGroup" }
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "22",
+            "ToPort": "22",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "80",
+            "ToPort": "80",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "443",
+            "ToPort": "443",
+            "CidrIp": "0.0.0.0/0"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": "3306",
+            "ToPort": "3306",
+            "CidrIp": "10.0.0.0/16"
+          }
+        ]
+      }
+    },
+
+    "AppServerALB" : {
+      "Type" : "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties" : {
+        "Name" : { "Fn::Join": ["-", [ {"Ref": "AWS::StackName"}, "AppServerALB"] ] },
+        "SecurityGroups" : [ { "Ref" : "AppServerLoadBalancerSecurityGroup" } ],
+        "Scheme": "internet-facing",
+        "IpAddressType": "ipv4",
+        "Subnets" : [ { "Ref" : "PublicSubnetA" }, { "Ref" : "PublicSubnetB" }, { "Ref" : "PublicSubnetC" } ]
+      }
+    },
+
+    "AppServerLoadBalancerSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable HTTP access on port 80",
+        "VpcId" : { "Ref" : "VPC" },
+        "SecurityGroupIngress" : [
+          { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0" },
+          { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0" }
+        ],
+        "SecurityGroupEgress" : [
+          { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"},
+          { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0"}
+        ]
+      }
+    },
+
+    "AppTgtGrp" : {
+      "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties" : {
+        "Name": {
+          "Fn::Join": ["-", [ {"Ref": "AWS::StackName"}, "AppTgtGrp"] ]
+        },
+        "Port": 80,
+        "Protocol": "HTTP",
+        "HealthCheckIntervalSeconds" : 30,
+        "HealthCheckTimeoutSeconds" : 5,
+        "HealthyThresholdCount" : 3,
+        "HealthCheckPath": "/status.php",
+        "VpcId": {"Ref" : "VPC"}
+      }
+    },
+
+    "Listener80": {
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties": {
+        "DefaultActions": [
+          {
+            "Type": "forward",
+            "TargetGroupArn": { "Ref": "AppTgtGrp" }
+          }
+        ],
+        "LoadBalancerArn": { "Ref": "AppServerALB" },
+        "Port": "80",
+        "Protocol": "HTTP"
+      }
+    },
+
+    "Listener443": {
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties": {
+        "DefaultActions": [
+          {
+            "Type": "forward",
+            "TargetGroupArn": { "Ref": "AppTgtGrp" }
+          }
+        ],
+        "LoadBalancerArn": { "Ref": "AppServerALB" },
+        "Certificates": [
+          {
+            "CertificateArn": {
+              "Ref": "AppServerCertificateID"
+            }
+          }
+        ],
+        "Port": "443",
+        "Protocol": "HTTPS"
+      }
+    },
+
+    "ListenerRuleService80": {
+      "Type" : "AWS::ElasticLoadBalancingV2::ListenerRule",
+      "Properties" : {
+        "Actions" : [
+          {
+            "TargetGroupArn" : {"Ref": "AppTgtGrp"},
+            "Type" : "forward"
+          }
+        ],
+        "Conditions" : [
+          {
+            "Field" : "path-pattern",
+            "Values" : [ "/" ]
+          }
+        ],
+        "ListenerArn" : {"Ref": "Listener80"},
+        "Priority" : 1
+      }
+    },
+
+    "ListenerRuleService443": {
+      "Type" : "AWS::ElasticLoadBalancingV2::ListenerRule",
+      "Properties" : {
+        "Actions" : [
+          {
+            "TargetGroupArn" : {"Ref": "AppTgtGrp"},
+            "Type" : "forward"
+          }
+        ],
+        "Conditions" : [
+          {
+            "Field" : "path-pattern",
+            "Values" : [ "/" ]
+          }
+        ],
+        "ListenerArn" : {"Ref": "Listener443"},
+        "Priority" : 1
+      }
+    }
+  }
+}
